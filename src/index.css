@@ -1,0 +1,11 @@
+/* Global base reset */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+html, body, #root {
+  height: 100%;
+  font-family: "Inter", system-ui, sans-serif;
+  background: linear-gradient(135deg, hsl(210,30%,10%), hsl(260,22%,8%));
+  color: hsl(210,12%,90%);
+}
