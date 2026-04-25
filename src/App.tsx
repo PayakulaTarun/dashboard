@@ -22,12 +22,7 @@ ChartJS.register(
 );
 
 /* ---------- constants ---------- */
-// Credentials come from .env via shopifyConfig – no secrets in source code
-const API_BASE = shopifyConfig.apiBase; // "/shopify" proxied by Vite
-const HEADERS: Record<string, string> = {
-  "X-Shopify-Access-Token": shopifyConfig.adminToken,
-  "Content-Type": "application/json",
-};
+const API_BASE = shopifyConfig.apiBase; // "/api/shopify" (Vercel Serverless Function)
 
 /* ---------- types ---------- */
 interface ShopInfo {
@@ -75,7 +70,7 @@ const fmt = (n: number, decimals = 0) =>
   });
 
 async function shopifyGet(path: string) {
-  const resp = await fetch(`${API_BASE}/${path}`, { headers: HEADERS });
+  const resp = await fetch(`${API_BASE}?path=${encodeURIComponent(path)}`);
   if (!resp.ok) throw new Error(`Shopify API error ${resp.status} for ${path}`);
   const json = await resp.json();
   return json[Object.keys(json)[0]];
@@ -83,24 +78,28 @@ async function shopifyGet(path: string) {
 
 async function shopifyGetAll(path: string): Promise<any[]> {
   const all: any[] = [];
-  let url = `${API_BASE}/${path}${path.includes("?") ? "&" : "?"}limit=250`;
+  const initialPath = `${path}${path.includes("?") ? "&" : "?"}limit=250`;
+  let url = `${API_BASE}?path=${encodeURIComponent(initialPath)}`;
+  
   while (url) {
-    const resp = await fetch(url, { headers: HEADERS });
+    const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Shopify API error ${resp.status}`);
     const json = await resp.json();
     const key = Object.keys(json)[0];
     all.push(...(json[key] ?? []));
+    
     const link = resp.headers.get("Link");
     if (link && link.includes('rel="next"')) {
       const m = link.match(/<([^>]+)>;\s*rel="next"/);
-      // Rewrite the absolute URL to go through our proxy
       if (m) {
-        const nextFull = m[1]; // e.g. https://basant-kothi-online.myshopify.com/admin/api/2024-07/products.json?...
-        const proxyPath = nextFull.replace(
-          "https://basant-kothi-online.myshopify.com/admin/api/2024-07",
-          API_BASE
-        );
-        url = proxyPath;
+        const nextFull = m[1]; // e.g. https://.../admin/api/2024-07/products.json?page_info=...
+        // Extract the part after /admin/api/2024-07/
+        const apiPathMatch = nextFull.match(/\/admin\/api\/[^/]+\/(.*)/);
+        if (apiPathMatch && apiPathMatch[1]) {
+           url = `${API_BASE}?path=${encodeURIComponent(apiPathMatch[1])}`;
+        } else {
+           url = "";
+        }
       } else {
         url = "";
       }
